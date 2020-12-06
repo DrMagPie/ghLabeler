@@ -30,16 +30,12 @@ type gh struct {
 }
 
 func (gh *gh) webhook(w http.ResponseWriter, r *http.Request) {
-	log.Info(r)
-	log.Info(r.Header)
-	log.Info(r.Header.Get("X-GitHub-Event"))
-	log.Info(r.Body)
 	payload, err := gh.hook.Parse(r, github.PushEvent)
+	log.Info(payload)
+	log.Info(err)
 	if err != nil && err == github.ErrEventNotFound {
 		log.Error("Event was not present in headdes")
 	}
-
-	log.Debug(fmt.Sprintf("%+v", payload))
 
 	switch payload := payload.(type) {
 	case github.PullRequestPayload:
@@ -64,7 +60,6 @@ func main() {
 	if accessToken == "" {
 		log.Fatal("$ACCESS_TOKEN must be set")
 	}
-	log.Info(accessToken)
 	hook, err := github.New(github.Options.Secret(accessToken))
 	if err != nil {
 		log.Fatal("Failed to create webhook", err)
