@@ -30,7 +30,10 @@ type gh struct {
 }
 
 func (gh *gh) webhook(w http.ResponseWriter, r *http.Request) {
-
+	log.Info(r)
+	log.Info(r.Header)
+	log.Info(r.Header.Get("X-GitHub-Event"))
+	log.Info(r.Body)
 	payload, err := gh.hook.Parse(r, github.PushEvent)
 	if err != nil && err == github.ErrEventNotFound {
 		log.Error("Event was not present in headdes")
