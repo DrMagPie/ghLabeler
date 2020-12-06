@@ -57,7 +57,12 @@ func main() {
 	if port == "" {
 		log.Fatal("$PORT must be set")
 	}
-	hook, err := github.New(github.Options.Secret(os.Getenv("ACCESS_TOKEN")))
+	accessToken := os.Getenv("ACCESS_TOKEN")
+	if accessToken == "" {
+		log.Fatal("$ACCESS_TOKEN must be set")
+	}
+	log.Info(accessToken)
+	hook, err := github.New(github.Options.Secret(accessToken))
 	if err != nil {
 		log.Fatal("Failed to create webhook", err)
 	}
