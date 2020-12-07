@@ -35,7 +35,7 @@ type gh struct {
 	projects []string
 }
 
-func errorResponse(w http.ResponseWriter, message error, httpStatusCode int) error {
+func respond(w http.ResponseWriter, message error, httpStatusCode int) error {
 	w.WriteHeader(httpStatusCode)
 	_, err := w.Write([]byte(message.Error()))
 	if err != nil {
@@ -44,16 +44,34 @@ func errorResponse(w http.ResponseWriter, message error, httpStatusCode int) err
 	return message
 }
 
+func labelExists(label string, labels []*github.Label) bool {
+	for _, l := range labels {
+		if *l.Name == label {
+			return true
+		}
+	}
+	return false
+}
+
+func itemInList(label string, labels []string) bool {
+	for _, l := range labels {
+		if label == l {
+			return true
+		}
+	}
+	return false
+}
+
 func (gh *gh) handleProjectCardEvent(ctx context.Context, w http.ResponseWriter, payload webhook.ProjectCardPayload) error {
 	// get all labels
-	var lables []*github.Label
+	var labels []*github.Label
 	req, err := gh.client.NewRequest("GET", fmt.Sprintf("%s/labels", payload.Repository.URL), nil)
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to construct lables request: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to construct labels request: %w", err), http.StatusInternalServerError)
 	}
-	_, err = gh.client.Do(ctx, req, &lables)
+	_, err = gh.client.Do(ctx, req, &labels)
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to list lables: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to list labels: %w", err), http.StatusInternalServerError)
 	}
 
 	// get project
@@ -61,63 +79,83 @@ func (gh *gh) handleProjectCardEvent(ctx context.Context, w http.ResponseWriter,
 	req, err = gh.client.NewRequest("GET", payload.ProjectCard.ProjectURL, nil)
 	req.Header.Add("Accept", "application/vnd.github.inertia-preview+json")
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to construct project request: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to construct project request: %w", err), http.StatusInternalServerError)
 	}
 	_, err = gh.client.Do(ctx, req, &project)
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to get project: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to get project: %w", err), http.StatusInternalServerError)
 	}
 
 	for i, tp := range gh.projects {
 		if *project.Name == tp {
 			break
 		} else if i+1 == len(gh.projects) {
-			return errorResponse(w, fmt.Errorf("Project is not tracked"), http.StatusBadRequest)
+			return respond(w, fmt.Errorf("Project is not tracked"), http.StatusBadRequest)
 		}
 	}
 
 	// get all columns in tracked repositories
 	columns, _, err := gh.client.Projects.ListProjectColumns(ctx, *project.ID, &github.ListOptions{})
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to list project columns: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to list project columns: %w", err), http.StatusInternalServerError)
 	}
 
 	// get issue
 	var issue *github.Issue
 	req, err = gh.client.NewRequest("GET", payload.ProjectCard.ContentURL, nil)
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to construct issue request: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to construct issue request: %w", err), http.StatusInternalServerError)
 	}
 	_, err = gh.client.Do(ctx, req, &issue)
 	if err != nil {
-		return errorResponse(w, fmt.Errorf("Failed to get issue: %w", err), http.StatusInternalServerError)
+		return respond(w, fmt.Errorf("Failed to get issue: %w", err), http.StatusInternalServerError)
 	}
 
 	for _, column := range columns {
-		exists := false
-		for _, lable := range lables {
-			if *lable.Name == *column.Name {
-				exists = true
-			}
-		}
-		if !exists {
-			_, _, err = gh.client.Issues.CreateLabel(ctx, payload.Repository.Owner.Login, payload.Repository.Name, &github.Label{Name: column.Name})
-			if err != nil {
-				return errorResponse(w, fmt.Errorf("Failed to add lable: %w", err), http.StatusInternalServerError)
-			}
-		}
-		if payload.ProjectCard.ColumnID == *column.ID {
-			_, _, err = gh.client.Issues.AddLabelsToIssue(ctx, payload.Repository.Owner.Login, payload.Repository.Name, *issue.Number, []string{*column.Name})
-			if err != nil {
-				return errorResponse(w, fmt.Errorf("Failed to add lable: %w", err), http.StatusInternalServerError)
-			}
-			continue
-		}
-		for _, lable := range issue.Labels {
-			if *lable.Name == *column.Name {
-				_, err = gh.client.Issues.RemoveLabelForIssue(ctx, payload.Repository.Owner.Login, payload.Repository.Name, *issue.Number, *lable.Name)
+		for _, item := range strings.Split(*column.Name, " ") {
+			if payload.ProjectCard.ColumnID == *column.ID && strings.HasPrefix(item, "users:") {
+				users := strings.Split(strings.TrimPrefix(item, "users:"), ",")
+				var usersToRemove []string
+				for _, assignee := range issue.Assignees {
+					if !itemInList(*assignee.Login, users) {
+						usersToRemove = append(usersToRemove, *assignee.Login)
+					}
+				}
+				issue, _, err = gh.client.Issues.RemoveAssignees(ctx, payload.Repository.Owner.Login, payload.Repository.Name, *issue.Number, usersToRemove)
 				if err != nil {
-					return errorResponse(w, fmt.Errorf("Failed to remove lable: %w", err), http.StatusInternalServerError)
+					return respond(w, fmt.Errorf("Failed to delete assignees: %w", err), http.StatusInternalServerError)
+				}
+				issue, _, err = gh.client.Issues.AddAssignees(ctx, payload.Repository.Owner.Login, payload.Repository.Name, *issue.Number, users)
+				if err != nil {
+					return respond(w, fmt.Errorf("Failed to add assignees: %w", err), http.StatusInternalServerError)
+				}
+			} else if strings.HasPrefix(item, "labels:") {
+				columnLabels := strings.Split(strings.TrimPrefix(item, "labels:"), ",")
+
+				for _, label := range columnLabels {
+					if !labelExists(label, labels) {
+						_, _, err = gh.client.Issues.CreateLabel(ctx, payload.Repository.Owner.Login, payload.Repository.Name, &github.Label{Name: &label})
+						if err != nil {
+							return respond(w, fmt.Errorf("Failed to add label: %w", err), http.StatusInternalServerError)
+						}
+					}
+				}
+
+				if payload.ProjectCard.ColumnID == *column.ID {
+					_, _, err = gh.client.Issues.AddLabelsToIssue(ctx, payload.Repository.Owner.Login, payload.Repository.Name, *issue.Number, columnLabels)
+					if err != nil {
+						return respond(w, fmt.Errorf("Failed to add label: %w", err), http.StatusInternalServerError)
+					}
+					continue
+				}
+
+				for _, label := range issue.Labels {
+					if itemInList(*label.Name, columnLabels) {
+						_, err = gh.client.Issues.RemoveLabelForIssue(ctx, payload.Repository.Owner.Login, payload.Repository.Name, *issue.Number, *label.Name)
+						if err != nil {
+							return respond(w, fmt.Errorf("Failed to remove label: %w", err), http.StatusInternalServerError)
+						}
+					}
 				}
 			}
 		}
@@ -126,20 +164,20 @@ func (gh *gh) handleProjectCardEvent(ctx context.Context, w http.ResponseWriter,
 }
 
 func (gh *gh) webhook(w http.ResponseWriter, r *http.Request) {
-	payload, err := gh.hook.Parse(r, webhook.PullRequestEvent, webhook.ProjectCardEvent)
+	payload, err := gh.hook.Parse(r, webhook.ProjectCardEvent, webhook.PingEvent)
 	if err != nil && err == webhook.ErrEventNotFound {
-		log.Error(errorResponse(w, fmt.Errorf("Event was not present in headdes: %w", err), http.StatusBadRequest))
+		log.Error(respond(w, fmt.Errorf("Event was not present in headdes: %w", err), http.StatusBadRequest))
 		return
 	}
 
 	switch payload := payload.(type) {
-	case webhook.PullRequestPayload:
-		log.Info("PullRequestPayload")
 	case webhook.ProjectCardPayload:
 		err := gh.handleProjectCardEvent(r.Context(), w, payload)
 		if err != nil {
 			log.Error(err)
 		}
+	case webhook.PingPayload:
+		fmt.Fprintf(w, "Connection established")
 	default:
 		log.Warn("This event is not supported")
 	}
