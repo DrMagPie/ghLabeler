@@ -8,15 +8,15 @@ When deploying utility you need to provide several variables:
 - `PROJECT_NAMES` comma separated list of project names, that will be affected by this utility. __Note__ Project must be in repo. It does not work with ORG level projects. eg `Sample Project,Another project`
 - `PORT` port on which utility will listen
 
-when deployed utility will listen ar root url: `http(s)://somehost.com/`
+when deployed utility will listen at root url: `http(s)://somehost.com/`
 If you don't have a web server to deploy the script on, use a free instance of [Heroku](https://www.heroku.com/).
 
 ## Configuring
 When you have deployed `ghLabeler` you need to set up your repo to work with it.
 1. Create project(s) named as entries in `PROJECT_NAMES` variable on your server.
 1. Setup columns.
-    - Add to name of your columns `lables:` tag with comma separated list of lable names to use when card gets into that column. eg `lables:New,Web,Test`
-    - Add to name of your columns `users:` tag with comma separated list of user names to assign to the card when it gets into that column. eg `Users:DrMagPie,Conor,Rick`
+    - To the name of each column add `labels:` tag followed by comma separated list of label's names to use when card gets into that column. eg `lables:New,Web,Test`
+    - To the name of each column add `users:` tag followed by comma separated list of user names to assign to the card when it gets into that column. eg `Users:DrMagPie,Conor,Rick`
     - __Note__ these list are not required. You can use only one of them.
 1. setup webhook
     - _Content type_ must be set to `application/json`
