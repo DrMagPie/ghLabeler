@@ -1,0 +1,47 @@
+# github.com/golang/protobuf v1.3.2
+github.com/golang/protobuf/proto
+# github.com/google/go-github/v33 v33.0.0
+## explicit
+github.com/google/go-github/v33/github
+# github.com/google/go-querystring v1.0.0
+github.com/google/go-querystring/query
+# github.com/heroku/x v0.0.26
+## explicit
+github.com/heroku/x/hmetrics
+github.com/heroku/x/hmetrics/onload
+# github.com/sirupsen/logrus v1.7.0
+## explicit
+github.com/sirupsen/logrus
+# golang.org/x/crypto v0.0.0-20190829043050-9756ffdc2472
+golang.org/x/crypto/cast5
+golang.org/x/crypto/openpgp
+golang.org/x/crypto/openpgp/armor
+golang.org/x/crypto/openpgp/elgamal
+golang.org/x/crypto/openpgp/errors
+golang.org/x/crypto/openpgp/packet
+golang.org/x/crypto/openpgp/s2k
+# golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297
+golang.org/x/net/context
+golang.org/x/net/context/ctxhttp
+# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
+## explicit
+golang.org/x/oauth2
+golang.org/x/oauth2/internal
+# golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# google.golang.org/appengine v1.6.1
+## explicit
+google.golang.org/appengine/internal
+google.golang.org/appengine/internal/base
+google.golang.org/appengine/internal/datastore
+google.golang.org/appengine/internal/log
+google.golang.org/appengine/internal/remote_api
+google.golang.org/appengine/internal/urlfetch
+google.golang.org/appengine/urlfetch
+# gopkg.in/go-playground/webhooks.v5 v5.16.0
+## explicit
+gopkg.in/go-playground/webhooks.v5/github
+# gopkg.in/yaml.v2 v2.2.4
+## explicit
