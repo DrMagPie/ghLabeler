@@ -45,8 +45,6 @@ func errorResponse(w http.ResponseWriter, message error, httpStatusCode int) err
 }
 
 func (gh *gh) handleProjectCardEvent(ctx context.Context, w http.ResponseWriter, payload webhook.ProjectCardPayload) error {
-	log.Info("ProjectCard")
-
 	// get all labels
 	var lables []*github.Label
 	req, err := gh.client.NewRequest("GET", fmt.Sprintf("%s/labels", payload.Repository.URL), nil)
@@ -137,7 +135,6 @@ func (gh *gh) webhook(w http.ResponseWriter, r *http.Request) {
 	switch payload := payload.(type) {
 	case webhook.PullRequestPayload:
 		log.Info("PullRequestPayload")
-		log.Info(payload)
 	case webhook.ProjectCardPayload:
 		err := gh.handleProjectCardEvent(r.Context(), w, payload)
 		if err != nil {
@@ -150,7 +147,6 @@ func (gh *gh) webhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	log.Info("Starting ghLabeler")
 	port := os.Getenv("PORT")
 	if port == "" {
 		log.Fatal("$PORT must be set")
@@ -171,6 +167,7 @@ func main() {
 	tc := oauth2.NewClient(context.Background(), ts)
 	ghHook := &gh{hook: hook, client: github.NewClient(tc), projects: strings.Split(os.Getenv("PROJECT_NAMES"), ",")}
 	http.HandleFunc("/", ghHook.webhook)
+	log.Info("Starting ghLabeler")
 	err = http.ListenAndServe(fmt.Sprint(":", port), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe has failed", err)
